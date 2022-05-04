@@ -51,47 +51,68 @@ HANDLER is the function that will be executed, when the route is matched */
 app.get('/balance/:address', (req, res) => {
   const {address} = req.params;
   const balance = balances[address] || 0; //'balance' is either set to an adress that exists or is set to zero
-  res.send({ balance });
+  res.send({ balance }); //we send {balance} to the client side???
 });
 
 app.post('/send', (req, res) => {
-  const {sender, recipient, amount, signature} = req.body;
-  const msgHash = bytesToHex(keccak_256(recipient, amount));
-  
-  //const signature = secp.sign(msgHash, privateKey); //does this need an await?
-  //the recoveredPublicKey should return the public key if the signature is correct
-  const recoveredPublicKey = secp.recoverPublicKey(msgHash, signature, 1); //not sure about the recovery number, what is that?
-
-  if(balances[recoveredPublicKey]){
-    //allow
-  } else{
-    //something is wrong!
-  }
+  const {recipient, amount, privateKey} = req.body;
 
 
-  balances[sender] -= amount;
-  balances[recipient] = (balances[recipient] || 0) + +amount;
-  res.send({ balance: balances[sender] });
+  (async () => {
+    //creating the message with the infos from client side:
+    const message = JSON.stringify({
+      to: recipient,
+      amount: parseInt(amount)
+    });
+    
+    //creating the messagehash
+    const messageHash =bytesToHex(keccak_256(message));
+    
+    //getting the signature
+    const signatureArray = await secp.sign(messageHash, privateKey,{recovered: true});
+    
+    
+    //unpacking into signature and recovery-bit and turning signature into hex;
+    let signature = signatureArray[0];
+    signature = Buffer.from(signature).toString('hex');
+    const recoverybit = signatureArray[1]
+    
+
+    //recover the public key
+    let recoveredPublicKey =secp.recoverPublicKey(messageHash, signature, recoverybit)
+
+    //turn into hex and slice appropriately
+    recoveredPublicKey = Buffer.from(recoveredPublicKey).toString('hex');
+    recoveredPublicKey = "0x" + recoveredPublicKey.slice(recoveredPublicKey.length - 40);
+    
+    //logging all the variables to the terminal for debugging
+    console.log(`message ${message}`);
+    console.log(`messageHash      ${messageHash}`);
+    console.log(`signaturearray       ${signatureArray}`);
+    console.log(`signature      ${signature}`);
+    console.log(`recoverybit     ${recoverybit}`);
+    console.log(`recoveredPublicKey        ${recoveredPublicKey}`); 
+    
+    if(secp.verify(signature, messageHash, recoveredPublicKey)){ //won't execute since recoveredPublicKey does not match the actual public key
+      balances[recoveredPublicKey] -= amount;
+      balances[recipient] = (balances[recipient] || 0) + +amount;
+      res.send({ balance: balances[recoveredPublicKey] });
+    }else {
+      console.error("did not work");
+      return;}
+  })(); //do these () always need to be there for async-await to work?
 });
 
 app.listen(port, () => {
   console.log(`Listening on port ${port}!`);
   console.log(`Available Accounts \n ===================`)
-  console.log(`(1) ${publicKey1} (100)${balances[publicKey1]}`);
-  console.log(`(2) ${publicKey2} (50)`);
-  console.log(`(3) ${publicKey3} (75)`);
+  console.log(`(1) ${publicKey1} ${balances[publicKey1]}`);
+  console.log(`(2) ${publicKey2} ${balances[publicKey2]}`);
+  console.log(`(3) ${publicKey3} ${balances[publicKey3]}`);
   console.log(`\n Private Keys \n ======================`);
   console.log(`(1) ${privateKey1}`);
   console.log(`(2) ${privateKey2}`);
   console.log(`(3) ${privateKey3}`);
-
-  //console.log(`\n ${msgHash}`)
-  /*
-  let x =0;
-  for(let i in balances){
-    console.log(`(${x}) ${i} (${balances.i})`);
-    x++;
-  }
-  */
+  console.log();
   
 });

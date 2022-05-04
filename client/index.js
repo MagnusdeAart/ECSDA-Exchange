@@ -15,14 +15,14 @@ document.getElementById("exchange-address").addEventListener('input', ({ target:
   });
 });
 
-document.getElementById("transfer-amount").addEventListener('click', () => {
-  const sender = document.getElementById("exchange-address").value;
+document.getElementById("transfer-amount").addEventListener('click', () => { //when you click on "transfer amount", set all these variables to the corresponding fields id's
+  //const sender = document.getElementById("exchange-address").value;
   const amount = document.getElementById("send-amount").value;
   const recipient = document.getElementById("recipient").value;
-  const signature = document.getElementById("signature").value; 
+  const privateKey = document.getElementById("privateKey").value; 
 
-  const body = JSON.stringify({
-    sender, amount, recipient, signature
+  const body = JSON.stringify({ //we pack the 3 variables into the variable "body"
+    amount, recipient, privateKey
   });
 
   const request = new Request(`${server}/send`, { method: 'POST', body });
